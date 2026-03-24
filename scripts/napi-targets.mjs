@@ -13,7 +13,7 @@ const TARGET_SUFFIXES = {
 
 const TARGET_RUNNERS = {
   "aarch64-apple-darwin": "macos-14",
-  "x86_64-apple-darwin": "macos-13",
+  "x86_64-apple-darwin": "macos-14",
   "aarch64-unknown-linux-gnu": "ubuntu-24.04-arm",
   "x86_64-unknown-linux-gnu": "ubuntu-latest",
   "x86_64-pc-windows-msvc": "windows-latest",
