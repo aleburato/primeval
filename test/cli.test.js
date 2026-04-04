@@ -90,6 +90,30 @@ test("cli suppresses progress with --progress off", () => {
   assert.equal(result.stderr.trim(), "");
 });
 
+test("cli suppresses progress with --progress auto when stderr is not a tty", () => {
+  const tmpDir = makeTmpDir();
+  const output = path.join(tmpDir, "out.svg");
+
+  const result = runCli([
+    fixturePath,
+    "--output",
+    output,
+    "--count",
+    "4",
+    "--resize-input",
+    "8",
+    "--output-size",
+    "16",
+    "--seed",
+    "7",
+    "--progress",
+    "auto",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr.trim(), "");
+});
+
 test("cli treats --alpha 0 as auto", () => {
   const tmpDir = makeTmpDir();
   const output = path.join(tmpDir, "out.svg");

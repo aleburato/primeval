@@ -19,6 +19,14 @@ const TARGET_RUNNERS = {
   "x86_64-pc-windows-msvc": "windows-latest",
 };
 
+const RUNTIME_TARGETS = {
+  "aarch64-apple-darwin": { platform: "darwin", arch: "arm64", abi: null },
+  "x86_64-apple-darwin": { platform: "darwin", arch: "x64", abi: null },
+  "aarch64-unknown-linux-gnu": { platform: "linux", arch: "arm64", abi: "gnu" },
+  "x86_64-unknown-linux-gnu": { platform: "linux", arch: "x64", abi: "gnu" },
+  "x86_64-pc-windows-msvc": { platform: "win32", arch: "x64", abi: "msvc" },
+};
+
 const DEFAULT_PACKAGE_JSON = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "..",
@@ -32,6 +40,19 @@ const DEFAULT_PACKAGE_LOCK = path.resolve(
 
 export function optionalDependencyNamesForTargets(packageName, targets) {
   return targets.map((target) => `${packageName}-${packageSuffixForTarget(target)}`);
+}
+
+export function runtimeTargetForTarget(target) {
+  const runtime = RUNTIME_TARGETS[target];
+  if (!runtime) {
+    throw new Error(`unsupported napi target: ${target}`);
+  }
+
+  return {
+    target,
+    suffix: packageSuffixForTarget(target),
+    ...runtime,
+  };
 }
 
 export function releaseMatrixForTargets(targets) {
@@ -275,7 +296,7 @@ function npmCommand() {
   return process.platform === "win32" ? "npm.cmd" : "npm";
 }
 
-function packageSuffixForTarget(target) {
+export function packageSuffixForTarget(target) {
   const suffix = TARGET_SUFFIXES[target];
   if (!suffix) {
     throw new Error(`unsupported napi target: ${target}`);

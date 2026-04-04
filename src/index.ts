@@ -150,6 +150,16 @@ interface NormalizedRequest {
 
 // --- Normalization ---
 
+function isAbortSignal(value: unknown): value is AbortSignal {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    typeof (value as { aborted?: unknown }).aborted === "boolean" &&
+    typeof (value as { addEventListener?: unknown }).addEventListener === "function" &&
+    typeof (value as { removeEventListener?: unknown }).removeEventListener === "function"
+  );
+}
+
 function normalizeInput(input: unknown): NormalizedInput {
   if (!input || typeof input !== "object") {
     throw new ValidationError("input is required");
@@ -225,6 +235,12 @@ function normalizeRequest(request: unknown): NormalizedRequest {
   }
 
   const execution = (req.execution ?? {}) as Record<string, unknown>;
+  if (execution.onProgress !== undefined && typeof execution.onProgress !== "function") {
+    throw new ValidationError("execution.onProgress must be a function");
+  }
+  if (execution.signal !== undefined && !isAbortSignal(execution.signal)) {
+    throw new ValidationError("execution.signal must be an AbortSignal");
+  }
 
   return {
     input,

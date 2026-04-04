@@ -145,6 +145,27 @@ test("package version updates rewrite optional dependency versions from napi tar
   });
 });
 
+test("binding loader only references declared optional dependency packages", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+  const bindingSource = fs.readFileSync(path.join(process.cwd(), "binding.js"), "utf8");
+  const referencedPackages = [
+    ...new Set(
+      [...bindingSource.matchAll(/require\('(@aleburato\/primeval[^']+)'\)/g)].map(
+        ([, packageName]) => packageName,
+      ),
+    ),
+  ].sort();
+
+  assert.deepEqual(referencedPackages, Object.keys(pkg.optionalDependencies).sort());
+});
+
+test("package scripts regenerate the checked-in binding loader before packing", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+
+  assert.match(pkg.scripts.prepack, /generate:binding/);
+  assert.match(pkg.scripts["build:node"], /generate:binding/);
+});
+
 test("artifact verification accepts matching native payloads", () => {
   const artifactsDir = fs.mkdtempSync(path.join(os.tmpdir(), "primeval-artifacts-"));
   try {

@@ -42,7 +42,7 @@ Browse the full example gallery in [`docs/gallery.md`](docs/gallery.md).
 npm install @aleburato/primeval
 ```
 
-Prebuilt native addons are provided for macOS (arm64, x64), Linux (arm64, x64), and Windows (x64). Node 20+ is required.
+Prebuilt native addons are provided for macOS (arm64, x64), Linux GNU libc (arm64, x64), and Windows (x64). Node 20+ is required.
 
 The package also exposes a CLI binary named `primeval`.
 

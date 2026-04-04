@@ -223,6 +223,8 @@ async function main(): Promise<void> {
 
   const progress = parseProgress(values.progress);
   const start = Date.now();
+  const showProgress =
+    progress === "plain" || (progress === "auto" && Boolean(process.stderr.isTTY));
 
   const result = await approximate({
     input: { kind: "path", path: input },
@@ -248,7 +250,7 @@ async function main(): Promise<void> {
         : { repeat: parsePositiveInteger("repeat", values.repeat, 0) }),
     },
     execution:
-      progress === "off"
+      !showProgress
         ? undefined
         : {
             onProgress(info) {

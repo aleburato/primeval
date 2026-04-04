@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { toDataUri, ValidationError } from "@aleburato/primeval";
+
+const repoRoot = process.cwd();
+
+function runModule(script) {
+  return spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  });
+}
 
 test("package root import resolves", async () => {
   const mod = await import("@aleburato/primeval");
@@ -46,5 +56,57 @@ test("validation rejects missing input before native loading", () => {
       toDataUri(/** @type {any} */ (null));
     },
     (err) => err instanceof ValidationError,
+  );
+});
+
+test("approximate rejects non-function progress callbacks with ValidationError", () => {
+  const result = runModule(`
+    import { readFileSync } from "node:fs";
+    import { approximate, ValidationError } from "@aleburato/primeval";
+    const input = readFileSync("docs/readme/originals/monalisa.jpg");
+
+    try {
+      approximate({
+        input: { kind: "bytes", data: input },
+        output: "svg",
+        render: { count: 2, resizeInput: 8, outputSize: 16, seed: 7 },
+        execution: { onProgress: 123 },
+      });
+      console.log("NO_ERROR");
+    } catch (error) {
+      console.log(error instanceof ValidationError, error?.name, error?.message);
+    }
+  `);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    result.stdout.trim(),
+    "true ValidationError execution.onProgress must be a function",
+  );
+});
+
+test("approximate rejects invalid abort signals with ValidationError", () => {
+  const result = runModule(`
+    import { readFileSync } from "node:fs";
+    import { approximate, ValidationError } from "@aleburato/primeval";
+    const input = readFileSync("docs/readme/originals/monalisa.jpg");
+
+    try {
+      approximate({
+        input: { kind: "bytes", data: input },
+        output: "svg",
+        render: { count: 1, resizeInput: 8, outputSize: 16, seed: 7 },
+        execution: { signal: {} },
+      });
+      console.log("NO_ERROR");
+    } catch (error) {
+      console.log(error instanceof ValidationError, error?.name, error?.message);
+    }
+  `);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    result.stdout.trim(),
+    "true ValidationError execution.signal must be an AbortSignal",
   );
 });
