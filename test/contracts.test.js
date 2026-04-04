@@ -105,10 +105,7 @@ test("wrapper leaves render defaults to Rust", () => {
 test("alpha validation message is aligned across surfaces", () => {
   const messages = [
     parseAlphaMessage(readRepoFile("src", "index.ts"), "src/index.ts"),
-    parseAlphaMessage(
-      readRepoFile("crates", "primeval-render", "src", "lib.rs"),
-      "crates/primeval-render/src/lib.rs",
-    ),
+    parseAlphaMessage(readRepoFile("src", "cli.ts"), "src/cli.ts"),
     parseAlphaMessage(
       readRepoFile("crates", "primeval-render", "src", "lib.rs"),
       "crates/primeval-render/src/lib.rs",
@@ -127,6 +124,10 @@ test("binding uses shared Rust option parsers", () => {
   assert.match(bindingSource, /parse_alpha_str/);
   assert.match(bindingSource, /parse_background_str/);
   assert.match(bindingSource, /parse_seed_i64/);
+});
+
+test("obsolete rust cli tree is absent", () => {
+  assert.equal(fs.existsSync(path.join(repoRoot, "crates", "primeval-cli")), false);
 });
 
 test("package test script exercises the native package path", () => {

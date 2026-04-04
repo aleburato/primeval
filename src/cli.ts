@@ -33,6 +33,17 @@ const VALID_SHAPES = [
 
 type ProgressMode = "auto" | "plain" | "off";
 
+function parseOutputFormat(value: string): OutputFormat | undefined {
+  const normalized = value.toLowerCase();
+  if (normalized === "jpeg") {
+    return "jpg";
+  }
+  if ((VALID_FORMATS as readonly string[]).includes(normalized)) {
+    return normalized as OutputFormat;
+  }
+  return undefined;
+}
+
 function printUsage(): void {
   process.stdout.write(
     [
@@ -40,7 +51,7 @@ function printUsage(): void {
       "",
       "Options:",
       "  -o, --output <path|->      Output path (or - for stdout)",
-      "      --format <fmt>         svg|png|jpg|gif (optional override)",
+      "      --format <fmt>         svg|png|jpg|jpeg|gif (optional override)",
       "      --count <n>            Number of optimization steps",
       "      --shape <kind>         any|triangle|rectangle|ellipse|circle|rotated-rectangle|quadratic|rotated-ellipse|polygon",
       "      --alpha <n>            Alpha 0..255 where 0 means auto",
@@ -87,8 +98,9 @@ function inferFormat(outputPath: string): OutputFormat {
   }
 
   const extension = path.extname(outputPath).slice(1).toLowerCase();
-  if ((VALID_FORMATS as readonly string[]).includes(extension)) {
-    return extension as OutputFormat;
+  const format = parseOutputFormat(extension);
+  if (format) {
+    return format;
   }
   fail("could not infer output format from output extension; use --format");
 }
@@ -189,8 +201,12 @@ async function main(): Promise<void> {
   }
 
   let format = values.format as OutputFormat | undefined;
-  if (format !== undefined && !(VALID_FORMATS as readonly string[]).includes(format)) {
-    fail(`unknown output format: ${format}`);
+  if (format !== undefined) {
+    const parsedFormat = parseOutputFormat(format);
+    if (!parsedFormat) {
+      fail(`unknown output format: ${format}`);
+    }
+    format = parsedFormat;
   }
   format ??= inferFormat(outputPath);
 

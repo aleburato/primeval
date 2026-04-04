@@ -23,3 +23,4 @@ node_modules/
 /cargo-flamegraph.trace
 /profile.json.gz
 /*.perf
+.DS_Store

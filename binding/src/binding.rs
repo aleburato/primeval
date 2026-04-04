@@ -50,6 +50,27 @@ fn with_tasks_mut<R>(f: impl FnOnce(&mut HashMap<u32, Arc<AtomicBool>>) -> R) ->
     with_task_registry_mut(tasks(), f)
 }
 
+fn with_registered_task<T, E>(
+    registry: &Mutex<HashMap<u32, Arc<AtomicBool>>>,
+    task_id: u32,
+    cancelled: Arc<AtomicBool>,
+    setup: impl FnOnce() -> std::result::Result<T, E>,
+) -> std::result::Result<T, E> {
+    with_task_registry_mut(registry, |tasks| {
+        tasks.insert(task_id, cancelled);
+    });
+
+    match setup() {
+        Ok(value) => Ok(value),
+        Err(error) => {
+            with_task_registry_mut(registry, |tasks| {
+                tasks.remove(&task_id);
+            });
+            Err(error)
+        }
+    }
+}
+
 #[napi(object, object_to_js = false)]
 pub struct NativeInputSource {
     pub kind: String,
@@ -110,45 +131,44 @@ pub fn start_approximate(env: &Env, request: NativeApproximateRequest) -> Result
         render,
         execution,
     } = request;
+    let progress = execution.and_then(|execution| execution.on_progress);
+    let request = normalize_request(input, output, render)?;
     let cancelled = Arc::new(AtomicBool::new(false));
     let cancelled_for_future = Arc::clone(&cancelled);
     let task_id = NEXT_TASK_ID.fetch_add(1, Ordering::Relaxed);
-    with_tasks_mut(|tasks| {
-        tasks.insert(task_id, Arc::clone(&cancelled));
-    });
-    let progress = execution.and_then(|execution| execution.on_progress);
-    let request = normalize_request(input, output, render)?;
 
-    let promise = env.spawn_future_with_callback(
-        async move {
-            let result = if let Some(tsfn) = progress.as_ref() {
-                let on_progress = |info: ProgressInfo| {
-                    let _ = tsfn.call(
-                        Ok(NativeProgressInfo {
-                            step: info.step,
-                            total: info.total,
-                            score: info.score,
-                        }),
-                        ThreadsafeFunctionCallMode::NonBlocking,
-                    );
+    with_registered_task(tasks(), task_id, cancelled, || {
+        let promise = env.spawn_future_with_callback(
+            async move {
+                let result = if let Some(tsfn) = progress.as_ref() {
+                    let on_progress = |info: ProgressInfo| {
+                        let _ = tsfn.call(
+                            Ok(NativeProgressInfo {
+                                step: info.step,
+                                total: info.total,
+                                score: info.score,
+                            }),
+                            ThreadsafeFunctionCallMode::NonBlocking,
+                        );
+                    };
+                    approximate(request, Some(&on_progress), cancelled_for_future.as_ref())
+                } else {
+                    approximate(request, None, cancelled_for_future.as_ref())
                 };
-                approximate(request, Some(&on_progress), cancelled_for_future.as_ref())
-            } else {
-                approximate(request, None, cancelled_for_future.as_ref())
-            };
-            with_tasks_mut(|tasks| {
-                tasks.remove(&task_id);
-            });
+                with_tasks_mut(|tasks| {
+                    tasks.remove(&task_id);
+                });
 
-            result.map(NativeApproximateResult::from).map_err(map_error)
-        },
-        |_, result| Ok(result),
-    )?;
+                result.map(NativeApproximateResult::from).map_err(map_error)
+            },
+            |_, result| Ok(result),
+        )?;
 
-    let mut handle = Object::new(env)?;
-    handle.set("promise", promise)?;
-    handle.set("taskId", task_id)?;
-    Ok(handle)
+        let mut handle = Object::new(env)?;
+        handle.set("promise", promise)?;
+        handle.set("taskId", task_id)?;
+        Ok(handle)
+    })
 }
 
 #[napi(js_name = "cancelApproximate")]
@@ -226,7 +246,9 @@ fn normalize_request(
             count: render.count.unwrap_or(defaults.count),
             shape,
             alpha,
-            repeat: render.repeat.map_or(defaults.repeat, |repeat| repeat as usize),
+            repeat: render
+                .repeat
+                .map_or(defaults.repeat, |repeat| repeat as usize),
             seed,
             background,
             resize_input: render.resize_input.unwrap_or(defaults.resize_input),
@@ -392,5 +414,34 @@ mod tests {
             with_task_registry(&registry, |tasks| tasks.keys().copied().collect::<Vec<_>>());
         assert!(task_ids.contains(&1));
         assert!(task_ids.contains(&2));
+    }
+
+    #[test]
+    fn registered_task_is_removed_when_setup_fails() {
+        let registry = Mutex::new(HashMap::new());
+        let cancelled = Arc::new(AtomicBool::new(false));
+
+        let result = with_registered_task(
+            &registry,
+            7,
+            cancelled,
+            || -> std::result::Result<(), &'static str> { Err("boom") },
+        );
+
+        assert_eq!(result, Err("boom"));
+        assert!(!with_task_registry(&registry, |tasks| tasks.contains_key(&7)));
+    }
+
+    #[test]
+    fn registered_task_stays_present_when_setup_succeeds() {
+        let registry = Mutex::new(HashMap::new());
+        let cancelled = Arc::new(AtomicBool::new(false));
+
+        let result = with_registered_task(&registry, 7, Arc::clone(&cancelled), || {
+            Ok::<_, &'static str>(cancelled.load(Ordering::SeqCst))
+        });
+
+        assert_eq!(result, Ok(false));
+        assert!(with_task_registry(&registry, |tasks| tasks.contains_key(&7)));
     }
 }

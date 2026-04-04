@@ -117,6 +117,60 @@ test("cli treats --alpha 0 as auto", () => {
   assert.match(svg, /^<svg\b/);
 });
 
+test("cli infers jpg output from .jpeg extension", () => {
+  const tmpDir = makeTmpDir();
+  const output = path.join(tmpDir, "out.jpeg");
+
+  const result = runCli([
+    fixturePath,
+    "--output",
+    output,
+    "--count",
+    "4",
+    "--resize-input",
+    "8",
+    "--output-size",
+    "16",
+    "--seed",
+    "7",
+    "--progress",
+    "off",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const bytes = fs.readFileSync(output);
+  assert.equal(bytes[0], 0xff);
+  assert.equal(bytes[1], 0xd8);
+});
+
+test("cli accepts --format jpeg as an alias for jpg", () => {
+  const tmpDir = makeTmpDir();
+  const output = path.join(tmpDir, "out.bin");
+
+  const result = runCli([
+    fixturePath,
+    "--output",
+    output,
+    "--format",
+    "jpeg",
+    "--count",
+    "4",
+    "--resize-input",
+    "8",
+    "--output-size",
+    "16",
+    "--seed",
+    "7",
+    "--progress",
+    "off",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const bytes = fs.readFileSync(output);
+  assert.equal(bytes[0], 0xff);
+  assert.equal(bytes[1], 0xd8);
+});
+
 test("cli prints help", () => {
   const result = runCli(["--help"]);
   assert.equal(result.status, 0);

@@ -73,7 +73,7 @@ Useful options:
 - `--output-size <N>` final replay resolution (default `1024`)
 - `--repeat <N>` extra candidates per step (default `0`)
 - `--seed <N>` for deterministic output
-- `--format svg|png|jpg|gif` optional output format override
+- `--format svg|png|jpg|jpeg|gif` optional output format override (`jpeg` is accepted as an alias for `jpg`)
 - `--progress auto|plain|off` progress reporting mode (default `auto`)
 
 Write SVG output to stdout:
@@ -211,7 +211,7 @@ The images below use identical settings (`shape: any`, `count: 200`, `seed: 42`)
 
 - `input` (required positional): input image path
 - `--output <PATH>` (required): output path, or `-` for stdout
-- `--format svg|png|jpg|gif` optional output format override. If omitted, the CLI infers one format from `--output`; `--output -` defaults to `svg`.
+- `--format svg|png|jpg|jpeg|gif` optional output format override. If omitted, the CLI infers one format from `--output`; `--output -` defaults to `svg`.
 - `--count <N>` optimization steps. Default: `100`.
 - `--shape any|triangle|rectangle|ellipse|circle|rotated-rectangle|quadratic|rotated-ellipse|polygon`. Default: `any`.
 - `--alpha <N>` shape opacity. Accepted values: `0..255` where `0` means `auto`. Default: `0`.
