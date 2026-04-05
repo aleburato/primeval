@@ -255,7 +255,7 @@ export function verifyArtifacts(artifactsDir, pkg) {
   }
 }
 
-function requiredString(value, label) {
+export function requiredString(value, label) {
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`${label} is required`);
   }

@@ -151,13 +151,7 @@ interface NormalizedRequest {
 // --- Normalization ---
 
 function isAbortSignal(value: unknown): value is AbortSignal {
-  return (
-    !!value &&
-    typeof value === "object" &&
-    typeof (value as { aborted?: unknown }).aborted === "boolean" &&
-    typeof (value as { addEventListener?: unknown }).addEventListener === "function" &&
-    typeof (value as { removeEventListener?: unknown }).removeEventListener === "function"
-  );
+  return value instanceof AbortSignal;
 }
 
 function normalizeInput(input: unknown): NormalizedInput {

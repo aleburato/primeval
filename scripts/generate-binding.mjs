@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   readPackageMetadata,
+  requiredString,
   runtimeTargetForTarget,
   validatePackageMetadata,
 } from "./napi-targets.mjs";
@@ -11,13 +12,6 @@ import {
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PACKAGE_JSON = path.resolve(SCRIPTS_DIR, "..", "package.json");
 const DEFAULT_OUTPUT = path.resolve(SCRIPTS_DIR, "..", "binding.js");
-
-function requiredString(value, label) {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`${label} is required`);
-  }
-  return value;
-}
 
 export function bindingMetadataForPackage(pkg) {
   const { packageName, targets } = validatePackageMetadata(pkg);
@@ -69,106 +63,17 @@ export function renderBindingLoader(pkg) {
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const rootPackage = require('./package.json')
-const packageVersion = rootPackage.version
-let nativeBinding = null
-const loadErrors = []
 
 const TARGETS = [
 ${renderTargetMetadata(targets)}
 ]
 
-const isMusl = () => {
-  let musl = false
-  if (process.platform === 'linux') {
-    musl = isMuslFromFilesystem()
-    if (musl === null) {
-      musl = isMuslFromReport()
-    }
-    if (musl === null) {
-      musl = isMuslFromChildProcess()
-    }
-  }
-  return musl
-}
-
-const isFileMusl = (file) => file.includes('libc.musl-') || file.includes('ld-musl-')
-
-const isMuslFromFilesystem = () => {
-  try {
-    return require('node:fs').readFileSync('/usr/bin/ldd', 'utf8').includes('musl')
-  } catch {
-    return null
-  }
-}
-
-const isMuslFromReport = () => {
-  let report = null
-  if (typeof process.report?.getReport === 'function') {
-    process.report.excludeNetwork = true
-    report = process.report.getReport()
-  }
-  if (!report) {
-    return null
-  }
-  if (report.header?.glibcVersionRuntime) {
-    return false
-  }
-  if (Array.isArray(report.sharedObjects)) {
-    return report.sharedObjects.some(isFileMusl)
-  }
-  return false
-}
-
-const isMuslFromChildProcess = () => {
-  try {
-    return require('node:child_process')
-      .execSync('ldd --version', { encoding: 'utf8' })
-      .includes('musl')
-  } catch {
-    return false
-  }
-}
-
-function currentRuntime() {
-  if (process.platform === 'linux') {
-    return {
-      platform: process.platform,
-      arch: process.arch,
-      abi: isMusl() ? 'musl' : 'gnu'
-    }
-  }
-
-  if (process.platform === 'win32') {
-    return {
-      platform: process.platform,
-      arch: process.arch,
-      abi: 'msvc'
-    }
-  }
-
-  return {
-    platform: process.platform,
-    arch: process.arch,
-    abi: null
-  }
-}
-
-function formatRuntime(runtime) {
-  return runtime.abi
-    ? \`\${runtime.platform}-\${runtime.arch}-\${runtime.abi}\`
-    : \`\${runtime.platform}-\${runtime.arch}\`
-}
-
-function resolveTarget(runtime) {
-  return (
-    TARGETS.find(
-      (target) =>
-        target.platform === runtime.platform &&
-        target.arch === runtime.arch &&
-        target.abi === runtime.abi,
-    ) ?? null
-  )
+// Match the current platform/arch against declared targets.
+// Add musl detection here if musl targets are ever shipped.
+function findTarget() {
+  return TARGETS.find(
+    (t) => t.platform === process.platform && t.arch === process.arch,
+  ) ?? null
 }
 
 function requireLocalFile(localFile) {
@@ -187,63 +92,33 @@ ${renderSwitchCases(targets, "packageName")}
   }
 }
 
-function assertPackageVersion(packageName) {
-  if (
-    !process.env.NAPI_RS_ENFORCE_VERSION_CHECK ||
-    process.env.NAPI_RS_ENFORCE_VERSION_CHECK === '0'
-  ) {
-    return
-  }
-
-  const installedVersion = require(\`\${packageName}/package.json\`).version
-  if (installedVersion !== packageVersion) {
-    throw new Error(
-      \`Native binding package version mismatch, expected \${packageVersion} but got \${installedVersion}. You can reinstall dependencies to fix this issue.\`,
-    )
-  }
-}
-
 function loadNativeBinding() {
-  if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH) {
-    try {
-      return require(process.env.NAPI_RS_NATIVE_LIBRARY_PATH)
-    } catch (error) {
-      loadErrors.push(error)
-    }
-  }
-
-  const runtime = currentRuntime()
-  const target = resolveTarget(runtime)
+  const target = findTarget()
   if (!target) {
     throw new Error(
       \`Unsupported OS: \${process.platform}, architecture: \${process.arch}. This package ships prebuilds only for the targets declared in package.json napi.targets.\`,
     )
   }
 
+  let firstError
   try {
     return requireLocalFile(target.localFile)
   } catch (error) {
-    loadErrors.push(error)
+    firstError = error
   }
 
   try {
-    const binding = requireOptionalPackage(target.packageName)
-    assertPackageVersion(target.packageName)
-    return binding
+    return requireOptionalPackage(target.packageName)
   } catch (error) {
-    loadErrors.push(error)
+    const combined = new Error(
+      \`Failed to load native binding for \${target.localFile}. Tried local file and package \${target.packageName}.\`,
+    )
+    combined.cause = firstError
+    throw combined
   }
-
-  const error = new Error(
-    \`Failed to load native binding for \${formatRuntime(runtime)}. Tried local file \${target.localFile} and package \${target.packageName}.\`,
-  )
-  error.cause = loadErrors[0]
-  throw error
 }
 
-nativeBinding = loadNativeBinding()
-
-export const { cancelApproximate, startApproximate } = nativeBinding
+export const { cancelApproximate, startApproximate } = loadNativeBinding()
 `;
 }
 
