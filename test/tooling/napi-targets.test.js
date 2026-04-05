@@ -159,7 +159,7 @@ test("binding loader only references declared optional dependency packages", () 
   assert.deepEqual(referencedPackages, Object.keys(pkg.optionalDependencies).sort());
 });
 
-test("package scripts regenerate the checked-in binding loader before packing", () => {
+test("package scripts regenerate the binding loader before packing", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
 
   assert.match(pkg.scripts.prepack, /generate:binding/);

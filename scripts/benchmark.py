@@ -20,7 +20,7 @@ from datetime import datetime
 from PIL import Image
 
 DEFAULT_BIN_A = Path("./dist/cli.js")
-DEFAULT_BUILD_CMD = ["npm", "run", "test:native:build"]
+DEFAULT_BUILD_CMD = "npm run build && npm run build:node"
 OUTPUT_DIR = Path("output")
 
 
@@ -1249,7 +1249,7 @@ def main():
 
     if not args.no_build and Path(args.bin_a) == DEFAULT_BIN_A:
         print(f"Building {label_a}...")
-        result = subprocess.run(DEFAULT_BUILD_CMD, capture_output=True, text=True, check=False)
+        result = subprocess.run(DEFAULT_BUILD_CMD, capture_output=True, text=True, check=False, shell=True)
         if result.returncode != 0:
             print("Build failed!")
             print(result.stderr)

@@ -133,6 +133,5 @@ test("obsolete rust cli tree is absent", () => {
 test("package test script exercises the native package path", () => {
   const pkg = JSON.parse(readRepoFile("package.json"));
 
-  assert.match(pkg.scripts.pretest, /build:node/);
   assert.match(pkg.scripts.test, /test\/native\.test\.js/);
 });

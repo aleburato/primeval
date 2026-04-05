@@ -38,10 +38,7 @@
     "build:node": "napi build -p primeval-node --release --platform --no-js --dts binding.d.ts --output-dir . && npm run generate:binding",
     "check:napi-targets": "node scripts/napi-targets.mjs check-package",
     "bump:version": "node scripts/napi-targets.mjs bump-version",
-    "test:native:build": "npm run build && npm run build:node",
-    "test:native": "node --test test/native.test.js",
     "typecheck": "tsc --noEmit",
-    "pretest": "npm run build && npm run build:node",
     "test": "node --test test/index.test.js test/contracts.test.js test/native.test.js test/cli.test.js",
     "test:tooling": "node --test test/tooling/*.test.js",
     "prepack": "npm run build && npm run generate:binding"

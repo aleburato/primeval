@@ -62,11 +62,13 @@ jobs:
 
       - run: npm run check:napi-targets
 
+      - run: npm run build && npm run build:node
+
+      - run: npm test
+
       - run: npm run test:tooling
 
       - run: npm run typecheck
-
-      - run: npm test
 
       - run: npm pack --dry-run
 

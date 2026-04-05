@@ -271,14 +271,12 @@ npm run test:tooling
 npm pack --dry-run
 ```
 
-`npm test` builds the TypeScript wrapper and native addon before running the full package test suite, including the native-path tests.
-
-For local development when you want the native build step by itself:
+`npm test` runs the full package test suite, including the native-path tests. Build the TypeScript wrapper and native addon first:
 
 ```bash
 npm ci
-npm run test:native:build
-npm run test:native
+npm run build && npm run build:node
+npm test
 ```
 
 The comparison harness lives at [`scripts/benchmark.py`](scripts/benchmark.py). It can compare any two compatible binaries and writes reports to `output/`.
