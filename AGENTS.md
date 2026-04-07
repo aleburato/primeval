@@ -35,6 +35,7 @@ Generated output:
 - Do not reinvent Rust defaults in TypeScript or napi request shims. Validate explicit user input there, but let Rust merge omitted fields onto its own defaults.
 - Prefer shared Rust parsers/helpers over duplicated string tables in binding.
 - Keep the TypeScript wrapper thin. Canonical runtime behavior should live in Rust unless there is a strong package-layer reason not to.
+- Keep `npm run build`, `npm run typecheck`, and `npm pack --dry-run` viable from a clean checkout before any local native build step. If runtime-generated native files are unavoidable, isolate them behind a small shim and cover the clean-checkout path with a tooling test.
 - Red-green-refactor TDD is a hard rule for code changes: add or update a failing test first, make it pass with the smallest useful change, then clean up.
 - During local development, prefer autofix variants of formatters and linters when they exist so routine cleanup is cheap for agents. Use check-only commands for final verification and CI.
 - Avoid duplicated CI/release verification logic. Prefer one reusable quality path.

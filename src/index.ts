@@ -1,8 +1,9 @@
 import {
-  startApproximate as nativeStart,
-  cancelApproximate as nativeCancel,
-} from "../binding.js";
-import type { NativeApproximateResult, NativeProgressInfo } from "../binding.js";
+  getNativeBinding,
+  type NativeApproximateRequest,
+  type NativeApproximateResult,
+  type NativeProgressInfo,
+} from "./native-binding.js";
 
 // --- Public types ---
 
@@ -115,11 +116,6 @@ const VALID_SHAPES: readonly Shape[] = [
 ];
 
 const VALID_OUTPUTS: readonly OutputFormat[] = ["svg", "png", "jpg", "gif"];
-
-interface NativeHandle {
-  promise: Promise<NativeApproximateResult>;
-  taskId: number;
-}
 
 interface NormalizedRender {
   count?: number;
@@ -275,6 +271,7 @@ function startApproximate(
   request: ApproximateRequest,
 ): { promise: Promise<ApproximateResult>; cancel: () => void } {
   const normalized = normalizeRequest(request);
+  const nativeBinding = getNativeBinding();
   const onProgress =
     normalized.execution.onProgress &&
     ((_: unknown, info: NativeProgressInfo | null): void => {
@@ -282,7 +279,7 @@ function startApproximate(
         normalized.execution.onProgress?.(info);
       }
     });
-  const handle = nativeStart({
+  const nativeRequest: NativeApproximateRequest = {
     input: normalized.input,
     output: normalized.output,
     render: {
@@ -304,9 +301,10 @@ function startApproximate(
         : { outputSize: normalized.render.outputSize }),
     },
     execution: onProgress ? { onProgress } : undefined,
-  }) as NativeHandle;
+  };
+  const handle = nativeBinding.startApproximate(nativeRequest);
 
-  const cancel = (): void => nativeCancel(handle.taskId);
+  const cancel = (): void => nativeBinding.cancelApproximate(handle.taskId);
   const signal = normalized.execution.signal;
   let onAbort: (() => void) | undefined;
   if (signal) {

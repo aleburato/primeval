@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -164,6 +165,41 @@ test("package scripts regenerate the binding loader before packing", () => {
 
   assert.match(pkg.scripts.prepack, /generate:binding/);
   assert.match(pkg.scripts["build:node"], /generate:binding/);
+});
+
+test("typescript build succeeds without generated binding files", () => {
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "primeval-tsc-"));
+
+  try {
+    for (const file of ["package.json", "tsconfig.json"]) {
+      fs.copyFileSync(path.join(process.cwd(), file), path.join(fixtureDir, file));
+    }
+
+    const fixtureSrcDir = path.join(fixtureDir, "src");
+    fs.mkdirSync(fixtureSrcDir, { recursive: true });
+    for (const file of fs.readdirSync(path.join(process.cwd(), "src"))) {
+      if (file.endsWith(".ts")) {
+        fs.copyFileSync(path.join(process.cwd(), "src", file), path.join(fixtureSrcDir, file));
+      }
+    }
+
+    fs.symlinkSync(path.join(process.cwd(), "node_modules"), path.join(fixtureDir, "node_modules"));
+
+    const result = spawnSync(
+      process.execPath,
+      [path.join(process.cwd(), "node_modules", "typescript", "bin", "tsc"), "-p", fixtureDir],
+      { encoding: "utf8" },
+    );
+
+    assert.equal(
+      result.status,
+      0,
+      `tsc failed without generated bindings:\n${result.stdout}\n${result.stderr}`,
+    );
+    assert.ok(fs.existsSync(path.join(fixtureDir, "dist", "index.js")));
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
 });
 
 test("artifact verification accepts matching native payloads", () => {
