@@ -3,10 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  readPackageMetadata,
-  requiredString,
-  runtimeTargetForTarget,
-  validatePackageMetadata,
+    readPackageMetadata,
+    requiredString,
+    runtimeTargetForTarget,
+    validatePackageMetadata,
 } from "./napi-targets.mjs";
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
