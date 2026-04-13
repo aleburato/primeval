@@ -311,39 +311,6 @@ That works out to a **`2.06x` speedup overall** (`51.5%` less total time). On th
 
 *Lower RMSE is better.* Times are from a single run on an Apple M-series machine and will vary by hardware. The upstream Go CLI does not expose a seed flag, so RMSE figures reflect one representative run rather than a deterministic replay.
 
-## Usage in the Wild
-
-Real projects using `primeval` beyond demos and benchmarks:
-
-- [nudaluce.com](https://nudaluce.com) *(NSFW)* — my photography website uses `primeval`-generated SVGs as **LQIPs** (low-quality image placeholders), replacing the more typical blurred-image placeholder technique with geometric previews.
-
-> **Want your project listed here?** Send an email to [ale.burato@icloud.com](mailto:ale.burato@icloud.com) with the URL of the related resource.
-
-## Development
-
-Run the standard quality gates from the repository root:
-
-```bash
-# Rust
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-
-# Node / package
-npm run typecheck
-npm test
-npm run test:tooling
-npm pack --dry-run
-```
-
-`npm test` runs the full package test suite, including the native-path tests. Build the TypeScript wrapper and native addon first:
-
-```bash
-npm ci
-npm run build && npm run build:node
-npm test
-```
-
 ## License
 
 Released under the [MIT License](LICENSE).
