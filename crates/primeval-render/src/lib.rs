@@ -1,3 +1,45 @@
+//! High-level render facade for `primeval`.
+//!
+//! This crate handles the full decode -> optimize -> encode path on top of
+//! `primeval-core`. It accepts either image bytes or filesystem paths, runs the
+//! approximation search, and returns SVG or raster output.
+//!
+//! The Node package and napi binding in this repository build on the same API.
+//! If you want the canonical Rust-side defaults and validation behavior, this is
+//! the crate to call.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use primeval_render::{
+//!     approximate, ApproximateRequest, ApproximateResult, InputSource, OutputFormat,
+//!     RenderOptions,
+//! };
+//! use std::sync::atomic::AtomicBool;
+//!
+//! let cancelled = AtomicBool::new(false);
+//! let result = approximate(
+//!     ApproximateRequest {
+//!         input: InputSource::Path("photo.jpg".into()),
+//!         output: OutputFormat::Svg,
+//!         render: RenderOptions {
+//!             count: 100,
+//!             resize_input: 128,
+//!             output_size: 512,
+//!             ..RenderOptions::default()
+//!         },
+//!     },
+//!     None,
+//!     &cancelled,
+//! )?;
+//!
+//! match result {
+//!     ApproximateResult::Svg { data, .. } => std::fs::write("out.svg", data)?,
+//!     ApproximateResult::Raster { .. } => unreachable!("requested svg output"),
+//! }
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
 use image::DynamicImage;
 use primeval_core::export::{average_background, encode_gif, encode_jpg, encode_png, thumbnail};
 use primeval_core::shapes::ShapeKind;
@@ -7,35 +49,55 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 pub use primeval_core::OutputFormat;
 
+/// Source image input for a render request.
 #[derive(Clone, Debug, PartialEq)]
 pub enum InputSource {
+    /// Raw encoded image bytes, typically PNG or JPEG.
     Bytes(Vec<u8>),
+    /// A filesystem path to an encoded image file.
     Path(PathBuf),
 }
 
+/// Alpha strategy for new shapes during optimization.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AlphaOption {
+    /// Let the optimizer choose alpha automatically.
     Auto,
+    /// Use a fixed alpha value for every committed shape.
     Fixed(u8),
 }
 
+/// Background color strategy for the initial canvas.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BackgroundOption {
+    /// Derive the background color from the input image.
     Auto,
+    /// Use an explicit RGBA color.
     Color(Color),
 }
 
+/// Render-time knobs that control optimization and final export.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct RenderOptions {
+    /// Number of optimization steps.
     pub count: u32,
+    /// Shape family to search during each step.
     pub shape: ShapeKind,
+    /// Alpha handling for new shapes.
     pub alpha: AlphaOption,
+    /// Extra hill-climb repetitions after each accepted step.
     pub repeat: usize,
+    /// Deterministic RNG seed. `None` chooses a non-deterministic seed.
     pub seed: Option<u64>,
+    /// Background fill strategy.
     pub background: BackgroundOption,
+    /// Working resolution used during optimization.
     pub resize_input: u32,
+    /// Maximum dimension of the final output replay.
     pub output_size: u32,
+    /// Worker override. `None` uses available parallelism.
     pub workers: Option<usize>,
+    /// Keep every `gif_frame_step`th replay frame when exporting GIFs.
     pub gif_frame_step: usize,
 }
 
@@ -56,6 +118,7 @@ impl Default for RenderOptions {
     }
 }
 
+/// Full request for a single rendered output.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApproximateRequest {
     pub input: InputSource,
@@ -63,12 +126,14 @@ pub struct ApproximateRequest {
     pub render: RenderOptions,
 }
 
+/// Request used when preparing a reusable approximation run.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RenderRequest {
     pub input: InputSource,
     pub render: RenderOptions,
 }
 
+/// Per-step progress information emitted during optimization.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProgressInfo {
     pub step: u32,
@@ -76,13 +141,16 @@ pub struct ProgressInfo {
     pub score: f64,
 }
 
+/// Final encoded render result.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ApproximateResult {
+    /// SVG output as UTF-8 text.
     Svg {
         data: String,
         width: u32,
         height: u32,
     },
+    /// Encoded raster output such as PNG, JPG, or GIF.
     Raster {
         format: OutputFormat,
         data: Vec<u8>,
@@ -120,6 +188,7 @@ impl ApproximateResult {
     }
 }
 
+/// Render-time failures from validation, decoding, cancellation, or encoding.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ApproximateError {
     Validation(String),
@@ -153,6 +222,7 @@ impl std::fmt::Display for ApproximateError {
 
 impl std::error::Error for ApproximateError {}
 
+/// Parse alpha input shared across Rust and binding layers.
 pub fn parse_alpha_str(value: &str) -> Result<AlphaOption, String> {
     if value.eq_ignore_ascii_case("auto") || value == "0" {
         return Ok(AlphaOption::Auto);
@@ -167,6 +237,7 @@ pub fn parse_alpha_str(value: &str) -> Result<AlphaOption, String> {
     Ok(AlphaOption::Fixed(parsed as u8))
 }
 
+/// Parse numeric alpha input where `None` and `0` both mean auto.
 pub fn parse_alpha_u32(value: Option<u32>) -> Result<AlphaOption, String> {
     match value {
         None => Ok(AlphaOption::Auto),
@@ -176,6 +247,7 @@ pub fn parse_alpha_u32(value: Option<u32>) -> Result<AlphaOption, String> {
     }
 }
 
+/// Parse a background color string or the special `auto` value.
 pub fn parse_background_str(value: &str) -> Result<BackgroundOption, String> {
     if value.eq_ignore_ascii_case("auto") {
         return Ok(BackgroundOption::Auto);
@@ -185,10 +257,13 @@ pub fn parse_background_str(value: &str) -> Result<BackgroundOption, String> {
     Ok(BackgroundOption::Color(color))
 }
 
+/// Parse a signed binding-layer seed into the Rust-side unsigned form.
 pub fn parse_seed_i64(value: i64) -> Result<u64, String> {
     u64::try_from(value).map_err(|_| "seed must be a positive integer".to_string())
 }
 
+/// Reusable prepared run that can be exported in multiple formats without
+/// rerunning optimization.
 pub struct ApproximationRun {
     model: Model,
     gif_frame_step: usize,
@@ -198,16 +273,19 @@ pub struct ApproximationRun {
 }
 
 impl ApproximationRun {
+    /// Final output width after replay.
     #[must_use]
     pub const fn width(&self) -> u32 {
         self.model.output_width
     }
 
+    /// Final output height after replay.
     #[must_use]
     pub const fn height(&self) -> u32 {
         self.model.output_height
     }
 
+    /// Encode the prepared run into a single output format.
     pub fn result(&mut self, output: OutputFormat) -> Result<ApproximateResult, ApproximateError> {
         let width = self.width();
         let height = self.height();
@@ -257,6 +335,7 @@ impl ApproximationRun {
     }
 }
 
+/// Decode, optimize, and encode a single output in one call.
 pub fn approximate(
     request: ApproximateRequest,
     on_progress: Option<&dyn Fn(ProgressInfo)>,
@@ -273,6 +352,7 @@ pub fn approximate(
     run.result(request.output)
 }
 
+/// Decode and optimize once, then return a reusable run for later encoding.
 pub fn prepare(
     request: RenderRequest,
     on_progress: Option<&dyn Fn(ProgressInfo)>,
@@ -378,6 +458,7 @@ fn decode_input(input: &InputSource) -> Result<DynamicImage, ApproximateError> {
     }
 }
 
+/// Choose the default worker count from available system parallelism.
 pub fn default_worker_count() -> usize {
     std::thread::available_parallelism()
         .map(std::num::NonZeroUsize::get)
