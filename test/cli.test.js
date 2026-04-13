@@ -219,3 +219,71 @@ test("cli exits non-zero with missing input file", () => {
 
   assert.equal(result.status, 1);
 });
+
+test("cli auto-derives output filename when --output is omitted", () => {
+  const tmpDir = makeTmpDir();
+  // Copy fixture into tmpDir so auto-derived file lands alongside it
+  const inputCopy = path.join(tmpDir, "monalisa.jpg");
+  fs.copyFileSync(fixturePath, inputCopy);
+
+  const result = runCli([
+    inputCopy,
+    "--count", "4",
+    "--resize-input", "8",
+    "--output-size", "16",
+    "--seed", "7",
+    "--progress", "off",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const expected = path.join(tmpDir, "monalisa_primitive.jpg");
+  assert.ok(fs.existsSync(expected), `expected output file ${expected} to exist`);
+  const svg = fs.readFileSync(expected);
+  // JPEG magic bytes (auto-derived format matches input extension)
+  assert.equal(svg[0], 0xff);
+  assert.equal(svg[1], 0xd8);
+});
+
+test("cli auto-derives output with correct format when --format is given", () => {
+  const tmpDir = makeTmpDir();
+  const inputCopy = path.join(tmpDir, "monalisa.jpg");
+  fs.copyFileSync(fixturePath, inputCopy);
+
+  const result = runCli([
+    inputCopy,
+    "--format", "png",
+    "--count", "4",
+    "--resize-input", "8",
+    "--output-size", "16",
+    "--seed", "7",
+    "--progress", "off",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const expected = path.join(tmpDir, "monalisa_primitive.png");
+  assert.ok(fs.existsSync(expected), `expected output file ${expected} to exist`);
+  const bytes = fs.readFileSync(expected);
+  // PNG magic bytes
+  assert.equal(bytes[0], 0x89);
+  assert.equal(bytes[1], 0x50);
+});
+
+test("cli fails with collision when auto-derived output already exists", () => {
+  const tmpDir = makeTmpDir();
+  const inputCopy = path.join(tmpDir, "monalisa.jpg");
+  fs.copyFileSync(fixturePath, inputCopy);
+  // Pre-create the would-be output file (jpg, matching input extension)
+  fs.writeFileSync(path.join(tmpDir, "monalisa_primitive.jpg"), "placeholder");
+
+  const result = runCli([
+    inputCopy,
+    "--count", "4",
+    "--resize-input", "8",
+    "--output-size", "16",
+    "--seed", "7",
+    "--progress", "off",
+  ]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /already exists/);
+});

@@ -48,38 +48,45 @@ The package also exposes a CLI binary named `primeval`.
 
 ## Quick Start
 
+Accepted input formats: **JPEG and PNG**. Output can be SVG, PNG, JPG, or animated GIF.
+
 Run the package CLI (no Rust build required):
 
 ```bash
-npx @aleburato/primeval docs/readme/originals/monalisa.jpg \
-  --output output/monalisa.svg \
-  --count 300 \
-  --shape any
+npx @aleburato/primeval photo.jpg --count 300
+```
+
+This writes `photo_primitive.jpg` next to the input file. Use `--output` to choose a different path or format:
+
+```bash
+npx @aleburato/primeval photo.jpg --output output/result.svg --count 300
 ```
 
 Or install globally to call `primeval` directly:
 
 ```bash
 npm install -g @aleburato/primeval
-primeval docs/readme/originals/monalisa.jpg --output output/monalisa.png --count 300
+primeval photo.jpg --count 300
 ```
+
+Replace `photo.jpg` with the path to your own JPEG or PNG image.
 
 Useful options:
 
 - `--shape any|triangle|rectangle|ellipse|circle|rotated-rectangle|quadratic|rotated-ellipse|polygon` with `any` as the default
-- `--count <N>` number of optimization steps (default `100`)
+- `--count <N>` number of optimization steps (default `100`); higher values improve quality at the cost of time
 - `--alpha <N>` shape opacity, `0`..`255` where `0` is `auto` (default `0`)
-- `--resize-input <N>` working resolution (default `256`)
-- `--output-size <N>` final replay resolution (default `1024`)
-- `--repeat <N>` extra candidates per step (default `0`)
+- `--resize-input <N>` resolution used during optimization; smaller is faster but less detailed (default `256`)
+- `--output-size <N>` resolution of the final exported image (default `1024`)
+- `--repeat <N>` extra random mutations to try per step; `0` means one candidate per step (default `0`)
 - `--seed <N>` for deterministic output
 - `--format svg|png|jpg|jpeg|gif` optional output format override (`jpeg` is accepted as an alias for `jpg`)
 - `--progress auto|plain|off` progress reporting mode (default `auto`)
 
-Write SVG output to stdout:
+Write SVG output to stdout (explicit `--output -` required, SVG only):
 
 ```bash
-primeval docs/readme/originals/monalisa.jpg --output - --count 200 > output/monalisa.svg
+primeval photo.jpg --output - --count 200 > out.svg
 ```
 
 See the full CLI help with:
@@ -120,18 +127,18 @@ console.log(result.data.slice(0, 32));
 
 Render options:
 
-- `count?: number` optimization steps. Default: `100`.
+- `count?: number` optimization steps. Higher values improve quality. Default: `100`.
 - `shape?: "any" | "triangle" | "rectangle" | "ellipse" | "circle" | "rotated-rectangle" | "quadratic" | "rotated-ellipse" | "polygon"`. Default: `"any"`.
-- `alpha?: number` shape opacity. Accepted values: `0..255` where `0` means auto. Default: `0`.
-- `repeat?: number` extra candidates per step. Default: `0`.
-- `seed?: number` deterministic RNG seed. Omit it to let Rust choose a non-deterministic seed.
+- `alpha?: number` shape opacity. Accepted values: `0..255` where `0` means auto-detect. Default: `0`.
+- `repeat?: number` extra random mutations to try per step. Default: `0`.
+- `seed?: number` deterministic RNG seed (non-negative integer). Omit it to let Rust choose a non-deterministic seed.
 - `background?: "auto" | string` background color. Use `"auto"` or a hex color in `RGB`, `RGBA`, `RRGGBB`, or `RRGGBBAA` form, with optional leading `#`. Default: `"auto"`.
-- `resizeInput?: number` working resolution. Default: `256`.
-- `outputSize?: number` final replay resolution. Default: `1024`.
+- `resizeInput?: number` resolution used during optimization. Smaller values run faster but capture less detail. Default: `256`.
+- `outputSize?: number` resolution of the final exported image. Default: `1024`.
 
 Execution options:
 
-- `onProgress?: (info) => void` receives `{ step, total, score }` once per optimization step.
+- `onProgress?: (info) => void` receives `{ step, total, score }` after each step, where `total` equals the `count` option and `score` is the current RMSE fit (lower is better).
 - `signal?: AbortSignal` cancels an in-flight render and rejects with `AbortError`.
 
 Convert results to a data URI:
@@ -149,6 +156,27 @@ const result = await approximate({
 
 const uri = toDataUri(result);
 console.log(uri.slice(0, 64));
+```
+
+Handle errors by catching typed error classes:
+
+```js
+import { approximate, NotFoundError, ValidationError } from "@aleburato/primeval";
+
+try {
+  const result = await approximate({
+    input: { kind: "path", path: "missing.jpg" },
+    output: "png",
+  });
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    console.error("image not found:", error.message);
+  } else if (error instanceof ValidationError) {
+    console.error("bad options:", error.message);
+  } else {
+    throw error;
+  }
+}
 ```
 
 Abort long renders with `AbortSignal`:
@@ -187,6 +215,7 @@ try {
 
 Package notes:
 
+- Accepted input formats: **JPEG and PNG**.
 - Missing `render` fields are forwarded to Rust and resolved there; the package does not reinvent render defaults in TypeScript.
 - Current Rust defaults are `count: 100`, `shape: "any"`, `alpha: 0` (`auto`), `repeat: 0`, omitted `seed`, `background: "auto"`, `resizeInput: 256`, and `outputSize: 1024`.
 - `approximate()` returns exactly one output format per call: `svg`, `png`, `jpg`, or `gif`.
@@ -209,22 +238,24 @@ The images below use identical settings (`shape: any`, `count: 200`, `seed: 42`)
 
 `primeval` accepts:
 
-- `input` (required positional): input image path
-- `--output <PATH>` (required): output path, or `-` for stdout
-- `--format svg|png|jpg|jpeg|gif` optional output format override. If omitted, the CLI infers one format from `--output`; `--output -` defaults to `svg`.
-- `--count <N>` optimization steps. Default: `100`.
+- `input` (required positional): path to a JPEG or PNG image
+- `--output <PATH>` (optional): output file path. Defaults to `<input-stem>_primitive.<ext>` next to the input file, where `<ext>` is inferred from `--format` or from the input extension. Use `-` to write SVG to stdout.
+- `--format svg|png|jpg|jpeg|gif` output format. If omitted, format is inferred from `--output`'s extension, or from the input extension when `--output` is also omitted. `jpeg` is accepted as an alias for `jpg`.
+- `--count <N>` optimization steps. Higher values improve quality. Default: `100`.
 - `--shape any|triangle|rectangle|ellipse|circle|rotated-rectangle|quadratic|rotated-ellipse|polygon`. Default: `any`.
-- `--alpha <N>` shape opacity. Accepted values: `0..255` where `0` means `auto`. Default: `0`.
+- `--alpha <N>` shape opacity. Accepted values: `0..255` where `0` means auto-detect. Default: `0`.
 - `--background <VALUE>` background color. Use `auto` or a hex color in `RGB`, `RGBA`, `RRGGBB`, or `RRGGBBAA` form, with optional leading `#`. Default: `auto`.
-- `--resize-input <N>` working resolution. Default: `256`.
-- `--output-size <N>` final replay resolution. Default: `1024`.
-- `--repeat <N>` extra candidates per step. Default: `0`.
-- `--seed <N>` deterministic RNG seed. If omitted, Rust generates one from the system clock.
-- `--progress auto|plain|off` progress reporting mode. Default: `auto`.
+- `--resize-input <N>` resolution used during optimization. Smaller values run faster but capture less detail; the final output is always rendered at `--output-size` resolution. Default: `256`.
+- `--output-size <N>` resolution of the final exported image. Default: `1024`.
+- `--repeat <N>` extra random mutations to try per step. Higher values improve quality but increase runtime. Default: `0`.
+- `--seed <N>` deterministic RNG seed (non-negative integer). If omitted, Rust selects a random seed.
+- `--progress auto|plain|off` write per-step progress to stderr. `auto` enables it only when stderr is a TTY. Default: `auto`.
+- `--version` print the package version and exit.
+- `-h, --help` print usage and exit.
 
 CLI notes:
 
-- `--output -` currently supports only SVG output.
+- When `--output` is omitted and the derived output file already exists, the CLI exits with an error. Use `--output` to specify a different path.
 
 ## Benchmarks
 

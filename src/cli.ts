@@ -47,10 +47,10 @@ function parseOutputFormat(value: string): OutputFormat | undefined {
 function printUsage(): void {
   process.stdout.write(
     [
-      "Usage: primeval <input> --output <path|-> [options]",
+      "Usage: primeval <input> [--output <path|->] [options]",
       "",
       "Options:",
-      "  -o, --output <path|->      Output path (or - for stdout)",
+      "  -o, --output <path|->      Output path (or - for stdout); defaults to <input-stem>_primitive.<ext>",
       "      --format <fmt>         svg|png|jpg|jpeg|gif (optional override)",
       "      --count <n>            Number of optimization steps",
       "      --shape <kind>         any|triangle|rectangle|ellipse|circle|rotated-rectangle|quadratic|rotated-ellipse|polygon",
@@ -189,25 +189,34 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const outputPath = values.output;
-  if (!outputPath) {
-    process.stderr.write("missing --output\n\n");
-    printUsage();
-    process.exit(1);
-  }
-
   if (positionals.length > 1) {
     fail(`unexpected positional arguments: ${positionals.slice(1).join(" ")}`);
   }
 
-  let format = values.format as OutputFormat | undefined;
-  if (format !== undefined) {
-    const parsedFormat = parseOutputFormat(format);
+  // Parse --format early — needed both for validation and output path derivation.
+  let format: OutputFormat | undefined;
+  if (values.format !== undefined) {
+    const parsedFormat = parseOutputFormat(values.format);
     if (!parsedFormat) {
-      fail(`unknown output format: ${format}`);
+      fail(`unknown output format: ${values.format}`);
     }
     format = parsedFormat;
   }
+
+  let outputPath = values.output;
+  if (!outputPath) {
+    // Auto-derive: <input-stem>_primitive.<ext> in the same directory as the input.
+    const ext = format ?? parseOutputFormat(path.extname(input).slice(1)) ?? "svg";
+    const stem = path.basename(input, path.extname(input));
+    const dir = path.dirname(input);
+    const derived = path.join(dir, `${stem}_primitive.${ext}`);
+    if (fs.existsSync(derived)) {
+      fail(`output file already exists: ${derived} — use --output to specify a different path`);
+    }
+    outputPath = derived;
+    process.stderr.write(`output: ${derived}\n`);
+  }
+
   format ??= inferFormat(outputPath);
 
   if (outputPath === "-" && format !== "svg") {
