@@ -1,6 +1,6 @@
 # primeval
 
-`primeval` turns photos and artwork into **stylized reconstructions built from simple geometric shapes**.
+`primeval` is a Rust-powered image approximation tool that turns photos and artwork into **stylized reconstructions built from simple geometric shapes**.
 
 Give it an input image and it searches for a layered approximation you can export as **PNG, JPG, GIF, or clean SVG** output.
 
@@ -91,6 +91,7 @@ These two options are independent: you can optimize at low resolution for speed 
 # Fast optimization at 128px, high-res 2048px PNG output
 primeval photo.jpg --output result.png --count 300 --resize-input 128 --output-size 2048
 ```
+
 - `--repeat <N>` extra random mutations to try per step; `0` means one candidate per step (default `0`)
 - `--seed <N>` for deterministic output
 - `--format svg|png|jpg|jpeg|gif` optional output format override (`jpeg` is accepted as an alias for `jpg`)
@@ -310,6 +311,10 @@ That works out to a **`2.06x` speedup overall** (`51.5%` less total time). On th
 | Polygon | 15.2s | 17.7s | 1.2x | 11.1 | 13.7 |
 
 *Lower RMSE is better.* Times are from a single run on an Apple M-series machine and will vary by hardware. The upstream Go CLI does not expose a seed flag, so RMSE figures reflect one representative run rather than a deterministic replay.
+
+## Used in Production
+
+- [nudaluce.com](https://nudaluce.com) *(NSFW)* — my photography portfolio uses `primeval`-generated SVG placeholders as image previews. The site includes artistic male nude portraits.
 
 ## License
 

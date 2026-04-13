@@ -67,5 +67,6 @@ npm run build:node
 
 ## Release Notes
 
+For release steps and workflow details, see [RELEASING.md](RELEASING.md).
 For support and versioning expectations, see [SUPPORT.md](SUPPORT.md).
 For vulnerability reporting, see [SECURITY.md](SECURITY.md).

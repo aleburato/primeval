@@ -6,13 +6,27 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
-  updatePackageVersion,
-  optionalDependencyNamesForTargets,
-  releaseMatrixForTargets,
-  validatePackageLock,
-  validatePackageMetadata,
-  verifyArtifacts,
+    optionalDependencyNamesForTargets,
+    releaseMatrixForTargets,
+    updatePackageVersion,
+    validatePackageLock,
+    validatePackageMetadata,
+    verifyArtifacts,
 } from "../../scripts/napi-targets.mjs";
+
+function parseRustToolchainVersion(source) {
+  const match = source.match(/^channel = "([^"]+)"$/m);
+  assert.ok(match, "missing rust toolchain channel");
+  return match[1];
+}
+
+function parseWorkflowToolchainVersions(source, fileLabel) {
+  const matches = [...source.matchAll(/toolchain:\s*([0-9]+\.[0-9]+\.[0-9]+)/g)].map(
+    ([, version]) => version,
+  );
+  assert.ok(matches.length > 0, `missing toolchain entries in ${fileLabel}`);
+  return matches;
+}
 
 test("optional dependencies are derived from napi targets", () => {
   assert.deepEqual(
@@ -165,6 +179,30 @@ test("package scripts regenerate the binding loader before packing", () => {
 
   assert.match(pkg.scripts.prepack, /generate:binding/);
   assert.match(pkg.scripts["build:node"], /generate:binding/);
+});
+
+test("rust toolchain pin matches workflows and contributing docs", () => {
+  const rustToolchain = fs.readFileSync(path.join(process.cwd(), "rust-toolchain.toml"), "utf8");
+  const qualityWorkflow = fs.readFileSync(
+    path.join(process.cwd(), ".github", "workflows", "quality.yml"),
+    "utf8",
+  );
+  const releaseWorkflow = fs.readFileSync(
+    path.join(process.cwd(), ".github", "workflows", "napi-prebuilds.yml"),
+    "utf8",
+  );
+  const contributing = fs.readFileSync(path.join(process.cwd(), "CONTRIBUTING.md"), "utf8");
+
+  const version = parseRustToolchainVersion(rustToolchain);
+  assert.deepEqual(
+    [...new Set(parseWorkflowToolchainVersions(qualityWorkflow, ".github/workflows/quality.yml"))],
+    [version],
+  );
+  assert.deepEqual(
+    [...new Set(parseWorkflowToolchainVersions(releaseWorkflow, ".github/workflows/napi-prebuilds.yml"))],
+    [version],
+  );
+  assert.match(contributing, new RegExp("Rust stable `" + version.replace(/\./g, "\\.") + "`"));
 });
 
 test("typescript build succeeds without generated binding files", () => {
