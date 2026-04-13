@@ -6,12 +6,12 @@ import path from "node:path";
 import { test } from "node:test";
 
 import {
-    optionalDependencyNamesForTargets,
-    releaseMatrixForTargets,
-    updatePackageVersion,
-    validatePackageLock,
-    validatePackageMetadata,
-    verifyArtifacts,
+  optionalDependencyNamesForTargets,
+  releaseMatrixForTargets,
+  updatePackageVersion,
+  validatePackageLock,
+  validatePackageMetadata,
+  verifyArtifacts,
 } from "../../scripts/napi-targets.mjs";
 
 function parseRustToolchainVersion(source) {
@@ -177,7 +177,8 @@ test("binding loader only references declared optional dependency packages", () 
 test("package scripts regenerate the binding loader before packing", () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
 
-  assert.match(pkg.scripts.prepack, /generate:binding/);
+  assert.match(pkg.scripts.prepack, /prepare:package/);
+  assert.match(pkg.scripts["prepare:package"], /generate:binding/);
   assert.match(pkg.scripts["build:node"], /generate:binding/);
 });
 
@@ -203,6 +204,45 @@ test("rust toolchain pin matches workflows and contributing docs", () => {
     [version],
   );
   assert.match(contributing, new RegExp("Rust stable `" + version.replace(/\./g, "\\.") + "`"));
+});
+
+test("package exposes canonical verify scripts and CI uses the split workflow", () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf8"));
+  const qualityWorkflow = fs.readFileSync(
+    path.join(process.cwd(), ".github", "workflows", "quality.yml"),
+    "utf8",
+  );
+  const contributing = fs.readFileSync(path.join(process.cwd(), "CONTRIBUTING.md"), "utf8");
+  const releasing = fs.readFileSync(path.join(process.cwd(), "RELEASING.md"), "utf8");
+
+  assert.equal(typeof pkg.scripts.verify, "string");
+  assert.equal(typeof pkg.scripts["verify:rust"], "string");
+  assert.equal(typeof pkg.scripts["verify:node"], "string");
+  assert.equal(typeof pkg.scripts["verify:pack"], "string");
+
+  assert.match(pkg.scripts["verify:rust"], /cargo fmt --check/);
+  assert.match(pkg.scripts["verify:rust"], /cargo clippy --all-targets -- -D warnings/);
+  assert.match(pkg.scripts["verify:rust"], /cargo test/);
+
+  assert.match(pkg.scripts["verify:node"], /npm run check:napi-targets/);
+  assert.match(pkg.scripts["verify:node"], /npm run typecheck/);
+  assert.match(pkg.scripts["verify:node"], /npm run build/);
+  assert.match(pkg.scripts["verify:node"], /npm run build:node/);
+  assert.match(pkg.scripts["verify:node"], /npm test/);
+  assert.match(pkg.scripts["verify:node"], /npm run test:tooling/);
+
+  assert.match(pkg.scripts["verify:pack"], /npm run prepare:package/);
+  assert.match(pkg.scripts["verify:pack"], /npm pack --dry-run --ignore-scripts/);
+
+  assert.match(pkg.scripts.verify, /npm run verify:rust/);
+  assert.match(pkg.scripts.verify, /npm run verify:node/);
+  assert.match(pkg.scripts.verify, /npm run verify:pack/);
+
+  assert.match(qualityWorkflow, /npm run verify:rust/);
+  assert.match(qualityWorkflow, /npm run verify:node/);
+  assert.match(qualityWorkflow, /npm run verify:pack/);
+  assert.match(contributing, /npm run verify/);
+  assert.match(releasing, /npm run verify/);
 });
 
 test("typescript build succeeds without generated binding files", () => {

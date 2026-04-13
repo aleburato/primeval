@@ -10,24 +10,7 @@ Run from the repository root on a clean checkout:
 
 ```bash
 npm ci
-npm run check:napi-targets
-
-# Rust
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-
-# Node / package
-npm run typecheck
-npm test
-npm run test:tooling
-npm pack --dry-run
-```
-
-If you changed the binding layer or generated loader, also run:
-
-```bash
-npm run build:node
+npm run verify
 ```
 
 ## Version Bump

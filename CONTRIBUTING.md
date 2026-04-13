@@ -40,22 +40,8 @@ npm run build:node
 Run these checks from the repository root before opening a pull request:
 
 ```bash
-# Rust
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-
-# Node / package
-npm run typecheck
-npm test
-npm run test:tooling
-npm pack --dry-run
-```
-
-If you changed the native binding or generated loader, also run:
-
-```bash
-npm run build:node
+npm ci
+npm run verify
 ```
 
 ## Pull Requests
