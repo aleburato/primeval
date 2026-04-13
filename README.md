@@ -44,6 +44,12 @@ npm install @aleburato/primeval
 
 Prebuilt native addons are provided for macOS (arm64, x64), Linux GNU libc (arm64, x64), and Windows (x64). Node 20+ is required.
 
+> Install notes
+>
+> - Linux musl/Alpine is not supported yet; use a glibc-based distribution or container image.
+> - Do not install with `--omit=optional` or equivalent package-manager settings; the native addon is delivered through platform-specific optional dependencies.
+> - Accepted input formats are JPEG and PNG only.
+
 The package also exposes a CLI binary named `primeval`.
 
 ## Quick Start
@@ -53,20 +59,20 @@ Accepted input formats: **JPEG and PNG**. Output can be SVG, PNG, JPG, or animat
 Run the package CLI (no Rust build required):
 
 ```bash
-npx @aleburato/primeval photo.jpg --count 300
+npx @aleburato/primeval photo.jpg --count 100
 ```
 
 This writes `photo_primitive.jpg` next to the input file. Use `--output` to choose a different path or format:
 
 ```bash
-npx @aleburato/primeval photo.jpg --output output/result.svg --count 300
+npx @aleburato/primeval photo.jpg --output output/result.svg --count 100
 ```
 
 Or install globally to call `primeval` directly:
 
 ```bash
 npm install -g @aleburato/primeval
-primeval photo.jpg --count 300
+primeval photo.jpg --count 100
 ```
 
 Replace `photo.jpg` with the path to your own JPEG or PNG image.
@@ -101,6 +107,13 @@ See the full CLI help with:
 ```bash
 primeval --help
 ```
+
+## Troubleshooting
+
+- `Unsupported Linux runtime: linux-<arch>-musl`: published Linux binaries currently target GNU libc only. Alpine and other musl-based environments are not supported yet.
+- `Failed to load native binding ...`: reinstall without omitting optional dependencies, make sure you are on Node 20+, and verify that your OS/CPU pair is one of the published targets listed above.
+- `invalid image data ...`: `primeval` accepts JPEG and PNG inputs only. Convert HEIC, WebP, TIFF, or other formats before rendering.
+- `... does not exist or is not readable`: the CLI and Node API accept filesystem paths, but the path must exist and be readable from the current process.
 
 ## Node Package
 

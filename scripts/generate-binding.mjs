@@ -68,12 +68,143 @@ const TARGETS = [
 ${renderTargetMetadata(targets)}
 ]
 
-// Match the current platform/arch against declared targets.
-// Add musl detection here if musl targets are ever shipped.
-function findTarget() {
-  return TARGETS.find(
+function detectLinuxLibc() {
+  if (process.platform !== 'linux') {
+    return null
+  }
+
+  const report = typeof process.report?.getReport === 'function'
+    ? process.report.getReport()
+    : null
+  const header = report?.header
+  if (
+    header &&
+    typeof header.glibcVersionRuntime === 'string' &&
+    header.glibcVersionRuntime.length > 0
+  ) {
+    return 'gnu'
+  }
+
+  const sharedObjects = report?.sharedObjects
+  if (
+    Array.isArray(sharedObjects) &&
+    sharedObjects.some(
+      (entry) =>
+        typeof entry === 'string' &&
+        (entry.includes('ld-musl-') || entry.includes('libc.musl-')),
+    )
+  ) {
+    return 'musl'
+  }
+
+  return null
+}
+
+function currentRuntimeAbi() {
+  if (process.platform !== 'linux') {
+    return null
+  }
+
+  return detectLinuxLibc()
+}
+
+function supportedTargetsForCurrentPlatform() {
+  return TARGETS.filter(
     (t) => t.platform === process.platform && t.arch === process.arch,
+  )
+}
+
+function formatTarget(target) {
+  return target.abi === null
+    ? target.platform + '-' + target.arch
+    : target.platform + '-' + target.arch + '-' + target.abi
+}
+
+// Match the current platform, architecture, and Linux ABI against declared targets.
+function findTarget() {
+  const runtimeAbi = currentRuntimeAbi()
+  return TARGETS.find(
+    (t) =>
+      t.platform === process.platform &&
+      t.arch === process.arch &&
+      (t.abi === null || t.abi === runtimeAbi),
   ) ?? null
+}
+
+function unsupportedRuntimeError() {
+  const platformTargets = supportedTargetsForCurrentPlatform()
+  if (platformTargets.length === 0) {
+    const supported = TARGETS.map(formatTarget).join(', ')
+    return new Error(
+      'Unsupported OS: ' +
+        process.platform +
+        ', architecture: ' +
+        process.arch +
+        '. This package ships prebuilds only for ' +
+        supported +
+        '.',
+    )
+  }
+
+  if (process.platform === 'linux') {
+    const runtimeAbi = currentRuntimeAbi()
+    const supportedAbis = [
+      ...new Set(
+        platformTargets
+          .map((target) => target.abi)
+          .filter((abi) => typeof abi === 'string'),
+      ),
+    ]
+
+    if (runtimeAbi === 'musl' && !supportedAbis.includes('musl')) {
+      return new Error(
+        'Unsupported Linux runtime: linux-' +
+          process.arch +
+          '-musl. Published native addons currently support GNU libc only for this architecture (' +
+          supportedAbis.join(', ') +
+          '). Alpine/musl is not supported yet.',
+      )
+    }
+
+    if (runtimeAbi === null) {
+      return new Error(
+        'Unsupported Linux runtime: unable to detect libc for linux-' +
+          process.arch +
+          '. Published native addons for this architecture require one of: ' +
+          supportedAbis.join(', ') +
+          '.',
+      )
+    }
+
+    return new Error(
+      'Unsupported Linux runtime: linux-' +
+        process.arch +
+        '-' +
+        runtimeAbi +
+        '. Published native addons for this architecture require one of: ' +
+        supportedAbis.join(', ') +
+        '.',
+    )
+  }
+
+  const supported = platformTargets.map(formatTarget).join(', ')
+  return new Error(
+    'Unsupported runtime: ' +
+      process.platform +
+      '-' +
+      process.arch +
+      '. Published native addons for this platform/architecture are: ' +
+      supported +
+      '.',
+  )
+}
+
+function describeLoadError(error) {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  return String(error)
 }
 
 function requireLocalFile(localFile) {
@@ -95,25 +226,29 @@ ${renderSwitchCases(targets, "packageName")}
 function loadNativeBinding() {
   const target = findTarget()
   if (!target) {
-    throw new Error(
-      \`Unsupported OS: \${process.platform}, architecture: \${process.arch}. This package ships prebuilds only for the targets declared in package.json napi.targets.\`,
-    )
+    throw unsupportedRuntimeError()
   }
 
-  let firstError
+  let localError
   try {
     return requireLocalFile(target.localFile)
   } catch (error) {
-    firstError = error
+    localError = error
   }
 
   try {
     return requireOptionalPackage(target.packageName)
-  } catch (error) {
+  } catch (packageError) {
     const combined = new Error(
-      \`Failed to load native binding for \${target.localFile}. Tried local file and package \${target.packageName}.\`,
+      [
+        \`Failed to load native binding for \${target.localFile}.\`,
+        \`Tried local file \${target.localFile} and package \${target.packageName}.\`,
+        'Make sure optional dependencies were installed (do not use --omit=optional or equivalent settings) and that you are running Node 20+ on a supported platform.',
+        \`Local file error: \${describeLoadError(localError)}\`,
+        \`Package error: \${describeLoadError(packageError)}\`,
+      ].join(' '),
     )
-    combined.cause = firstError
+    combined.cause = packageError
     throw combined
   }
 }
