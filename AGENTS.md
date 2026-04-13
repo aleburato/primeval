@@ -75,17 +75,4 @@ npm run build
 npm run build:node
 ```
 
-## Benchmarking
 
-Use `scripts/benchmark.py` to compare two binaries:
-
-```bash
-python3 scripts/benchmark.py \
-  --bin-a ./dist/cli.js \
-  --bin-b /path/to/other/binary \
-  --label-a current \
-  --label-b baseline \
-  --no-build
-```
-
-Reports are written to `output/`.

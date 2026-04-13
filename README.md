@@ -310,8 +310,6 @@ npm run build && npm run build:node
 npm test
 ```
 
-The comparison harness lives at [`scripts/benchmark.py`](scripts/benchmark.py). It can compare any two compatible binaries and writes reports to `output/`.
-
 ## License
 
 Released under the [MIT License](LICENSE).
