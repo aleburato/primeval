@@ -78,6 +78,13 @@ Useful options:
 - `--alpha <N>` shape opacity, `0`..`255` where `0` is `auto` (default `0`)
 - `--resize-input <N>` resolution used during optimization; smaller is faster but less detailed (default `256`)
 - `--output-size <N>` resolution of the final exported image (default `1024`)
+
+These two options are independent: you can optimize at low resolution for speed and still export at high resolution:
+
+```bash
+# Fast optimization at 128px, high-res 2048px PNG output
+primeval photo.jpg --output result.png --count 300 --resize-input 128 --output-size 2048
+```
 - `--repeat <N>` extra random mutations to try per step; `0` means one candidate per step (default `0`)
 - `--seed <N>` for deterministic output
 - `--format svg|png|jpg|jpeg|gif` optional output format override (`jpeg` is accepted as an alias for `jpg`)
@@ -135,6 +142,20 @@ Render options:
 - `background?: "auto" | string` background color. Use `"auto"` or a hex color in `RGB`, `RGBA`, `RRGGBB`, or `RRGGBBAA` form, with optional leading `#`. Default: `"auto"`.
 - `resizeInput?: number` resolution used during optimization. Smaller values run faster but capture less detail. Default: `256`.
 - `outputSize?: number` resolution of the final exported image. Default: `1024`.
+
+These two options are independent — optimize at low resolution for speed, export at full resolution:
+
+```js
+const result = await approximate({
+  input: { kind: "path", path: "photo.jpg" },
+  output: "png",
+  render: {
+    count: 300,
+    resizeInput: 128,  // fast optimization pass
+    outputSize: 2048,  // high-res final export
+  },
+});
+```
 
 Execution options:
 
