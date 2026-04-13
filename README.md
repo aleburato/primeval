@@ -296,7 +296,7 @@ That works out to a **`2.06x` speedup overall** (`51.5%` less total time). On th
 | Rotated ellipse | 24.8s | 39.4s | 1.6x | 11.8 | 13.8 |
 | Polygon | 15.2s | 17.7s | 1.2x | 11.1 | 13.7 |
 
-*Lower RMSE is better.* Times are from a single local benchmark run and will vary by machine. The upstream Go CLI does not expose a fixed seed flag, so the quality comparison reflects one representative run rather than a deterministic seed-matched replay.
+*Lower RMSE is better.* Times are from a single run on an Apple M-series machine and will vary by hardware. The upstream Go CLI does not expose a seed flag, so RMSE figures reflect one representative run rather than a deterministic replay.
 
 ## Usage in the Wild
 
