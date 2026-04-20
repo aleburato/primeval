@@ -7,8 +7,8 @@ members = [
 ]
 
 [workspace.package]
-homepage = "https://github.com/aleburato/primeval"
-repository = "https://github.com/aleburato/primeval"
+homepage = "https://github.com/domoarigatomrburato/primeval"
+repository = "https://github.com/domoarigatomrburato/primeval"
 license = "MIT"
 
 [workspace.lints.rust]
